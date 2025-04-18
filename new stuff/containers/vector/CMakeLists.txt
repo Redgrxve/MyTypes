@@ -7,5 +7,6 @@ project(vector)
 
 add_executable(${PROJECT_NAME}
     main.cpp
-    vector.h
+    nvector.h
+    debuglog.h
 )

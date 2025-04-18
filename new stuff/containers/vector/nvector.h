@@ -130,25 +130,22 @@ public:
     const T* begin() const { return m_vec; }
     const T* end() const { return m_vec + m_size; }
 
-    void pushBack(const T& item)
+    template<typename U>
+    void pushBack(U&& item)
     {
-        DEBUG_LOG("pushBack(const T& item)");
-
         if (m_size >= m_capacity)
             resize();
 
-        m_vec[m_size] = item;
+        m_vec[m_size] = std::forward<U>(item);
         ++m_size;
-    }
 
-    void pushBack(T&& item)
-    {
-        DEBUG_LOG("pushBack(T&& item)");
-        if (m_size >= m_capacity)
-            resize();
-
-        m_vec[m_size] = std::move(item);
-        ++m_size;
+#ifdef DEBUG
+        bool isLVal = std::is_lvalue_reference_v<U>;
+        if (isLVal)
+            std::cout << "Pushed lvalue\n";
+        else
+            std::cout << "Pushed rvalue\n";
+#endif
     }
 
 private:
