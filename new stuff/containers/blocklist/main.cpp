@@ -1,38 +1,45 @@
 #include <iostream>
 #include <list>
-// #include "nlist.h"
+#include <array>
+#include <deque>
+#include "blocklist.h"
 
 void bar();
 
 int main()
 {
-    // std::list<std::string> slist{"def1", "def2"};
-    // auto sit = slist.begin();
-    // slist.insert(sit, "new1");
-    // //sit = ++slist.begin();
-    // slist.insert(sit, "new2");
-    // slist.insert(sit, "new3");
-    // slist.insert(slist.end(), "new4");
-
-    // for (auto el : slist) {
-    //     std::cout << el << "\n";
+    // std::array<int, 5> arr;
+    // for (int i = 0; i < 5; ++i) {
+    //     arr[i] = i + 1;
     // }
-    // // std::cout << list.size() << "\n";
-    // // std::cout << list;
+
+    // for (int i = 4; i > 2; --i)
+    //     arr[i] = std::move_if_noexcept(arr[i - 1]);
+    // arr[2] = 0;
+
+    // for (int i = 0; i < 5; ++i) {
+    //     std::cout << arr[i];
+    // }
+
+    BlockList<std::string> l;
+    for (int i = 0; i < 20; ++i) {
+        l.insertFront("str" + std::to_string(i + 1));
+    }
+
+    l.insert(10, "new1");
+    l.insert(15, "new2");
+    //l.insert(1, "new3");
+
+
+    for (int i = 0; i < l.size(); ++i) {
+        std::cout << l[i] << "\n";
+    }
 
     // std::cout << std::endl;
 
-    // NList<std::string> list{"def1", "def2"};
-    // auto it = list.begin();
-    // list.insert(it, "new1");
-    // //it = ++list.begin();
-    // list.insert(it, "new2");
-    // list.insert(it, "new3");
-    // list.insert(list.end(), "new4");
-    // // for (auto it = list.begin(); it != list.end(); ++it) {
-    // //     list.insert(it, "str" + std::to_string(i++));
-    // // }
-    // std::cout << list.size() << "\n";
-    // std::cout << list;
+    // BlockList<std::string> l2(std::move(l));
+    // for (int i = 0; i < 20; ++i) {
+    //     std::cout << l2[i] << "\n";
+    // }
     return 0;
 }

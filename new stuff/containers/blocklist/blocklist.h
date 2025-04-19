@@ -1,175 +1,126 @@
 
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <utility>
 
-template<typename IteratorType>
-class ReverseIterator
-{
-    using T = IteratorType;
-
-private:
-    T it_;
-};
-
 namespace Details {
 
-struct ListNodeBase {
-    ListNodeBase() = default;
+struct BlockListNodeBase {
+    BlockListNodeBase() = default;
 
-    ListNodeBase *next{this};
-    ListNodeBase *prev{this};
+    BlockListNodeBase *next{this};
+    BlockListNodeBase *prev{this};
 };
 
 template <typename T>
-struct ListNode : public ListNodeBase
+class BlockListNode : public BlockListNodeBase
 {
-    template <typename U>
-    ListNode(U &&val)
-        : value(std::forward<U>(val)) {}
+public:
+    static constexpr uint16_t size = 4;
 
-    T value{};
+    template <typename U>
+    void set(size_t pos, U &&item) {
+        items_[pos] = std::forward<U>(item);
+    }
+
+    T &at(size_t pos) {
+        if (pos >= count_)
+            throw std::out_of_range("Index out of bounds;");
+        return items_[pos];
+    }
+
+    uint16_t count() const { return count_; }
+    bool isFilled() const { return count_ == size; }
+
+    template <typename U>
+    void pushFront(U &&item) {
+        if (count_ >= size)
+            throw std::out_of_range("Index out of bounds;");
+
+        if (count_ > 0)
+            shiftRight();
+
+        items_[0] = std::forward<U>(item);
+        ++count_;
+    }
+
+    template <typename U>
+    void pushBack(U &&item) {
+        if (count_ >= size)
+            throw std::out_of_range("Index out of bounds;");
+
+        items_[count_] = std::forward<U>(item);
+        ++count_;
+    }
+
+    template <typename U>
+    void push(size_t pos, U &&item) {
+        if (count_ >= size)
+            throw std::out_of_range("Index out of bounds;");
+
+        if (count_ > 0)
+            shiftRight(pos);
+
+        items_[pos] = std::forward<U>(item);
+        ++count_;
+    }
+
+    void shiftRight(size_t start = 0) {
+        for (int i = size - 1; i > start; --i)
+            items_[i] = std::move_if_noexcept(items_[i - 1]);
+    }
+
+private:
+    uint16_t count_{};
+    std::array<T, size> items_{};
 };
 
 }
 
 template <typename T>
-class NList
+class BlockList
 {
-    using NodeBase = Details::ListNodeBase;
-    using Node     = Details::ListNode<T>;
+    using NodeBase = Details::BlockListNodeBase;
+    using Node     = Details::BlockListNode<T>;
 
 public:
-    class ConstIterator
-    {
-        friend class NList;
-
-    public:
-        ConstIterator() = default;
-
-        //prefix
-        ConstIterator &operator++() {
-            node_ = node_->next;
-            return *this;
-        }
-
-        //postfix
-        ConstIterator operator++(int) {
-            auto tmp = *this;
-            node_ = node_->next;
-            return tmp;
-        }
-
-        //prefix
-        ConstIterator &operator--() {
-            node_ = node_->prev;
-            return *this;
-        }
-
-        //postfix
-        ConstIterator operator--(int) {
-            auto tmp = *this;
-            node_ = node_->prev;
-            return tmp;
-        }
-
-        const T &operator*() const {
-            return static_cast<Node*>(node_)->value;
-        }
-
-        bool operator!=(const ConstIterator &other) const {
-            return node_ != other.node_;
-        }
-
-        bool operator==(const ConstIterator &other) const {
-            return node_ == other.node_;
-        }
-
-    protected:
-        explicit ConstIterator(NodeBase *node)
-            : node_(node) {}
-
-        NodeBase *node_{};
-    };
-
-    class Iterator : public ConstIterator
-    {
-        friend class NList;
-
-        using ConstIterator::node_;
-
-    public:
-        Iterator() : ConstIterator() {}
-
-        //prefix
-        Iterator &operator++() {
-            node_ = node_->next;
-            return *this;
-        }
-
-        //postfix
-        Iterator operator++(int) {
-            auto tmp = *this;
-            node_ = node_->next;
-            return tmp;
-        }
-
-        //prefix
-        Iterator &operator--() {
-            node_ = node_->prev;
-            return *this;
-        }
-
-        //postfix
-        Iterator operator--(int) {
-            auto tmp = *this;
-            node_ = node_->prev;
-            return tmp;
-        }
-
-        T &operator*() {
-            return static_cast<Node*>(node_)->value;
-        }
-
-    private:
-        explicit Iterator(NodeBase *node)
-            : ConstIterator(node) {}
-    };
-
-    using ReverseIterator      = std::reverse_iterator<NList<T>::Iterator>;
-    using ConstReverseIterator = std::reverse_iterator<NList<T>::ConstIterator>;
-
-public:
-    NList()
+    BlockList()
         : size_(0), sent_(new NodeBase) {}
 
-    NList(const NList &other)
+    BlockList(const BlockList &other)
         : size_(0), sent_(new NodeBase)
     {
         for (const T &el : other)
             insertBack(el);
     }
 
-    NList(NList &&other) noexcept
+    BlockList(BlockList &&other) noexcept
         : size_(other.size_), sent_(other.sent_)
     {
         other.sent_ = new NodeBase;
         other.size_ = 0;
     }
 
-    NList(const std::initializer_list<T> &initList)
+    BlockList(const std::initializer_list<T> &initList)
         : size_(0), sent_(new NodeBase)
     {
         for (const T &el : initList)
             insertBack(el);
     }
 
-    ~NList() {
+    ~BlockList() {
         clear();
         delete sent_;
     }
-    
-    NList &operator=(const NList &other) {
+
+    T &operator[](size_t pos) {
+        Node* current = findNode(pos);
+        size_t blockIndex = 0;
+        return current->at(pos);
+    }
+
+    BlockList &operator=(const BlockList &other) {
         if (this == &other) return *this;
 
         clear();
@@ -179,7 +130,7 @@ public:
         return *this;
     }
 
-    NList &operator=(NList &&other) noexcept {
+    BlockList &operator=(BlockList &&other) noexcept {
         if (this == &other) return *this;
 
         clear();
@@ -193,7 +144,7 @@ public:
         return *this;
     }
 
-    NList &operator=(const std::initializer_list<T> &initList) {
+    BlockList &operator=(const std::initializer_list<T> &initList) {
         clear();
         for (const T &el : initList)
             insertBack(el);
@@ -201,30 +152,11 @@ public:
         return *this;
     }
 
-    friend std::ostream &operator<<(std::ostream &os, const NList &list) {
+    friend std::ostream &operator<<(std::ostream &os, const BlockList &list) {
         for (auto &el : list)
             os << el << "\n";
         return os;
     }
-
-    ConstIterator begin()  const { return ConstIterator(sent_->next); }
-    Iterator      begin()        { return Iterator(sent_->next); }
-
-    ConstIterator end()    const { return ConstIterator(sent_); }
-    Iterator      end()          { return Iterator(sent_); }
-
-    ConstIterator cbegin() const { return ConstIterator(sent_->next); }
-    ConstIterator cend()   const { return ConstIterator(sent_); }
-
-    /* ConstReverseIterator crbegin() const { return ConstReverseIterator(cbegin()); }
-    // ConstReverseIterator crend()   const { return ConstReverseIterator(cend()); }
-
-    // ConstReverseIterator rbegin()  const { return ConstReverseIterator(cbegin()); }
-    // ReverseIterator      rbegin()        { return ConstReverseIterator(begin()); }
-
-    // ConstReverseIterator rend()    const { return ConstReverseIterator(cend()); }
-     ReverseIterator      rend()          { return ConstReverseIterator(end()); }*/
-
 
     size_t size()  const { return size_; }
     bool   empty() const { return sent_->next == sent_; }
@@ -232,42 +164,92 @@ public:
 
     template <typename U>
     void insertFront(U &&item) {
-        Node *add = new Node(std::forward<U>(item));
+        Node *head = static_cast<Node *>(sent_->next);
+        ++size_;
+        if (head == sent_) {
+            initFirstNode(std::forward<U>(item));
+            return;
+        }
 
-        add->next = sent_->next;
+        if (!head->isFilled()) {
+            head->pushFront(std::forward<U>(item));
+            return;
+        }
+
+        Node *add = new Node;
+        add->pushFront(std::forward<U>(item));
+
+        add->next = head;
         add->prev = sent_;
 
+        head->prev = add;
         sent_->next = add;
-
-        ++size_;
     }
 
     template <typename U>
     void insertBack(U &&item) {
-        Node *add = new Node(std::forward<U>(item));
-        NodeBase *tail = sent_->prev;
+        Node *tail = static_cast<Node *>(sent_->prev);
+        ++size_;
+        if (tail == sent_) {
+            initFirstNode(std::forward<U>(item));
+            return;
+        }
+
+        if (!tail->isFilled()) {
+            tail->pushBack(std::forward<U>(item));
+            return;
+        }
+
+        Node *add = new Node;
+        add->pushBack(std::forward<U>(item));
 
         add->next = sent_;
         add->prev = sent_->prev;
 
         tail->next = add;
         sent_->prev = add;
-
-        ++size_;
     }
 
     template <typename U>
-    void insert(ConstIterator it, U &&item) {
-        Node *add = new Node(std::forward<U>(item));
-        NodeBase *cur = it.node_;
+    void insert(size_t pos, U &&item) {
+        if (pos > size_)
+            throw std::out_of_range("Index out of bounds");
 
-        add->next = cur;
-        add->prev = cur->prev;
+        if (pos == 0) {
+            insertFront(std::forward<U>(item));
+            return;
+        }
 
-        cur->prev->next = add;
-        cur->prev = add;
+        if (pos == size_) {
+            insertBack(std::forward<U>(item));
+            return;
+        }
 
+        Node *curr = findNode(pos);
         ++size_;
+
+        if (!curr->isFilled()) {
+            curr->push(pos, std::forward<U>(item));
+            return;
+        }
+
+        T lastItem = curr->at(curr->size - 1);
+        curr->shiftRight(pos);
+        curr->set(pos, std::forward<U>(item));
+
+        Node *next = static_cast<Node *>(curr->next);
+        if (!next->isFilled()) {
+            next->pushFront(std::move(lastItem));
+        } else {
+            Node *add = new Node;
+            add->pushBack(std::move(lastItem));
+
+            add->next = curr->next;
+            add->prev = curr;
+
+            curr->next->prev = add;
+            curr->next = add;
+        }
     }
 
     void clear() {
@@ -284,6 +266,71 @@ public:
     }
 
 private:
+    template <typename U>
+    void initFirstNode(U &&item) {
+        Node *add = new Node;
+        add->pushFront(std::forward<U>(item));
+
+        add->next = sent_;
+        add->prev = sent_;
+
+        sent_->next = add;
+        sent_->prev = add;
+    }
+
+    Node *findNode(size_t &pos) {
+        Node *res = static_cast<Node *>(sent_->next);
+        while (res != sent_) {
+            if (pos < res->count())
+                return res;
+
+            pos -= res->count();
+            res = static_cast<Node *>(res->next);
+        }
+        return res;
+    }
+
     size_t size_;
     NodeBase *sent_;
 };
+
+/*template <typename U>
+    void insertFront(U &&item) {
+        // Node *head = static_cast<Node *>(sent_->next);
+        // ++size_;
+        // if (head == sent_) {
+        //     addFirst(std::forward<U>(item));
+        //     return;
+        // }
+
+        // if (!head->isFilled()) {
+        //     head->pushFront(std::forward<U>(item));
+        //     return;
+        // }
+        // Node *next = static_cast<Node *>(head->next);
+        // if (next == sent_) {
+        //     next = new Node;
+
+        //     next->next = head->next;
+        //     next->prev = head;
+
+        //     head->next = next;
+        // }
+
+        // if (!next->isFilled()) {
+        //     T last = head->items[head->size - 1];
+        //     head->pushFront(std::forward<U>(item));
+        //     next->pushFront(std::forward<U>(last));
+        // } else {
+        //     Node *add = new Node;
+        //     add->pushFront(std::forward<U>(item));
+
+        //     add->next = head;
+        //     add->prev = sent_;
+
+        //     head->prev = add;
+
+        //     sent_->next = add;
+        // }
+    }*/
+
