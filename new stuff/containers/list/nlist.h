@@ -3,9 +3,6 @@
 #include <iostream>
 #include <utility>
 
-//доделать insert
-//разобраться с std::forward и универсальными ссылками
-
 namespace Details {
 
 struct ListNodeBase {
@@ -130,6 +127,9 @@ public:
             : ConstIterator(node) {}
     };
 
+    using ReverseIterator      = std::reverse_iterator<NList<T>::Iterator>;
+    using ConstReverseIterator = std::reverse_iterator<NList<T>::ConstIterator>;
+
 public:
     NList()
         : size_(0), sent_(new NodeBase) {}
@@ -192,14 +192,30 @@ public:
         return *this;
     }
 
-    ConstIterator cbegin() const { return ConstIterator(sent_->next); }
-    ConstIterator cend()   const { return ConstIterator(sent_); }
+    friend std::ostream &operator<<(std::ostream &os, const NList &list) {
+        for (auto &el : list)
+            os << el << "\n";
+        return os;
+    }
 
     ConstIterator begin()  const { return ConstIterator(sent_->next); }
     Iterator      begin()        { return Iterator(sent_->next); }
 
     ConstIterator end()    const { return ConstIterator(sent_); }
     Iterator      end()          { return Iterator(sent_); }
+
+    ConstIterator cbegin() const { return ConstIterator(sent_->next); }
+    ConstIterator cend()   const { return ConstIterator(sent_); }
+
+    /* ConstReverseIterator crbegin() const { return ConstReverseIterator(cbegin()); }
+    // ConstReverseIterator crend()   const { return ConstReverseIterator(cend()); }
+
+    // ConstReverseIterator rbegin()  const { return ConstReverseIterator(cbegin()); }
+    // ReverseIterator      rbegin()        { return ConstReverseIterator(begin()); }
+
+    // ConstReverseIterator rend()    const { return ConstReverseIterator(cend()); }
+     ReverseIterator      rend()          { return ConstReverseIterator(end()); }*/
+
 
     size_t size()  const { return size_; }
     bool   empty() const { return sent_->next == sent_; }
@@ -231,18 +247,19 @@ public:
         ++size_;
     }
 
-    // template <typename U>
-    // void insert(ConstIterator it, U &&item) {
-    //     Node *add = new Node(std::forward<U>(item));
+    template <typename U>
+    void insert(ConstIterator it, U &&item) {
+        Node *add = new Node(std::forward<U>(item));
+        NodeBase *cur = it.node_;
 
-    //     add->next = it.node_->next;
-    //     add->prev = it.node_->prev;
+        add->next = cur;
+        add->prev = cur->prev;
 
-    //     it.node_->prev->next = add;
-    //     it.node_->prev = add;
+        cur->prev->next = add;
+        cur->prev = add;
 
-    //     ++size_;
-    // }
+        ++size_;
+    }
 
     void clear() {
         auto current = static_cast<Node*>(sent_->next);
@@ -256,80 +273,6 @@ public:
         sent_->prev = sent_;
         size_ = 0;
     }
-
-    /*void insertFront(const T &item) {
-        Node *add = new Node(item);
-        ++size_;
-
-        if (!head_) {
-            head_ = add;
-
-            end_ = new Node;
-            end_->prev_ = head_;
-
-            head_->next = end_;
-            return;
-        }
-
-        add->next = head_;
-
-        head_->prev_ = add;
-        head_ = add;
-    }
-
-    template<typename U>
-    void insertFront(U &&item) {
-        Node *add = new Node(std::forward<U>(item));
-        ++size_;
-
-        if (!head_) {
-            initHead(add);
-            return;
-        }
-
-        add->next = head_;
-
-        head_->prev_ = add;
-        head_ = add;
-    }
-
-    void insertBack(const T &item) {
-        Node *add = new Node(item);
-        ++size_;
-
-        if (!head_) {
-            head_ = add;
-
-            tail_ = new Node;
-            tail_->prev = head_;
-
-            head_->next = tail_;
-            return;
-        }
-
-        add->next = tail_;
-        add->prev = tail_->prev;
-
-        tail_->prev->next = add;
-        tail_->prev = add;
-    }
-
-    template<typename U>
-    void insertBack(U &&item) {
-        Node *add = new Node(std::forward<U>(item));
-        ++size_;
-
-        if (!head_) {
-            initHead(add);
-            return;
-        }
-
-        add->next = tail_;
-        add->prev = tail_->prev_;
-
-        tail_->prev_->next_ = add;
-        tail_->prev_ = add;
-    }*/
 
 private:
     size_t size_;
