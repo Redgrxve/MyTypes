@@ -26,8 +26,12 @@ int main()
         l.insertFront("str" + std::to_string(i + 1));
     }
 
-    l.insert(10, "new1");
-    l.insert(15, "new2");
+    l.insert(1, "new1");
+    l.insert(12, "new2");
+    l.insert(10, "new3");
+
+    l.insert(10, "new4");
+    l.insert(15, "new5");
     //l.insert(1, "new3");
 
 
