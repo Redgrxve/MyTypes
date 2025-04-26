@@ -1,7 +1,9 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
+#include <array>
+#include <set>
+#include <stdexcept>
 #include <utility>
 
 namespace Details {
@@ -17,7 +19,10 @@ template <typename T>
 class BlockListNode : public BlockListNodeBase
 {
 public:
-    static constexpr uint16_t size = 4;
+    static constexpr uint16_t SIZE = 4;
+
+    uint16_t count()    const { return count_; }
+    bool     isFilled() const { return count_ == SIZE; }
 
     template <typename U>
     void set(size_t pos, U &&item) {
@@ -30,12 +35,13 @@ public:
         return items_[pos];
     }
 
-    uint16_t count() const { return count_; }
-    bool isFilled() const { return count_ == size; }
+    T &last() {
+        return items_[SIZE - 1];
+    }
 
     template <typename U>
     void pushFront(U &&item) {
-        if (count_ >= size)
+        if (count_ >= SIZE)
             throw std::out_of_range("Index out of bounds;");
 
         if (count_ > 0)
@@ -47,7 +53,7 @@ public:
 
     template <typename U>
     void pushBack(U &&item) {
-        if (count_ >= size)
+        if (count_ >= SIZE)
             throw std::out_of_range("Index out of bounds;");
 
         items_[count_] = std::forward<U>(item);
@@ -56,7 +62,7 @@ public:
 
     template <typename U>
     void push(size_t pos, U &&item) {
-        if (count_ >= size)
+        if (count_ >= SIZE)
             throw std::out_of_range("Index out of bounds;");
 
         if (count_ > 0)
@@ -67,57 +73,167 @@ public:
     }
 
     void shiftRight(size_t start = 0) {
-        for (int i = size - 1; i > start; --i)
+        for (int i = SIZE - 1; i > start; --i)
             items_[i] = std::move_if_noexcept(items_[i - 1]);
     }
 
 private:
-    uint16_t count_{};
-    std::array<T, size> items_{};
+    size_t count_{};
+    std::array<T, SIZE> items_{};
 };
 
-template <typename T, size_t SIZE>
+template <typename NodeItemType, size_t CAPACITY>
 class IndexTable
 {
-private:
-    struct IndexTableRow {
-        size_t index{};
-        T *item{};
-    };
-
-    std::array<IndexTableRow, SIZE> table_{};
-    uint16_t count_{};
+    using NodeBase = Details::BlockListNodeBase;
+    using Node     = Details::BlockListNode<NodeItemType>;
+    using TableRow = std::pair<size_t, Node*>;
 
 public:
     IndexTable() = default;
 
-    IndexTableRow &operator[](size_t i)             { return table_[i]; }
-    const IndexTableRow &operator[](size_t i) const { return table_[i]; }
+    //       Node *operator[](size_t pos)       { return table_[pos].second(); }
+    // const Node *operator[](size_t pos) const { return table_[pos].second(); }
 
     size_t count() const   { return table_.size_; }
-    bool isFilled() const  { return count_ < SIZE; }
+    bool isFilled() const  { return table_.size() == CAPACITY; }
 
-    void push(size_t index, T* item) {
-        if (count_ == SIZE)
-            throw std::out_of_range("Index out of bounds!");
+    Node *findClosest(size_t pos) {
+        if (table_.empty()) return nullptr;
 
-        table_[count_++] = {index, item};
+        auto it = table_.lower_bound({pos + 1, nullptr});
+        --it;
+
+        return it->second;
     }
+
+    void insert(size_t index, Node *node) {
+        if (table_.size() >= CAPACITY)
+            throw std::out_of_range("Table is filled!");
+
+        table_.insert({index, node});
+    }
+
+    void update(size_t index, Node *item) {
+        table_[index] = item;
+    }
+
+    void erase(size_t index) {
+        table_.erase(index);
+    }
+
+    void clear() {
+        table_.clear();
+    }
+
+private:
+    struct RowComparator {
+        bool operator()(const TableRow &a, const TableRow &b) const {
+            return a.first < b.first;
+        }
+    };
+
+    std::set<TableRow, RowComparator> table_{};
 };
 
+/* template <typename NodeItemType, size_t SIZE>
+// class IndexTable
+// {
+//     using NodeBase   = Details::BlockListNodeBase;
+//     using Node       = Details::BlockListNode<NodeItemType>;
+
+// private:
+//     struct IndexTableRow {
+//         size_t index{};
+//         Node *item{};
+//     };
+
+//     std::array<IndexTableRow, SIZE> table_{};
+//     uint16_t count_{};
+
+// public:
+//     IndexTable() = default;
+
+//           IndexTableRow &operator[](size_t i)       { return table_[i]; }
+//     const IndexTableRow &operator[](size_t i) const { return table_[i]; }
+
+//     size_t count() const   { return table_.size_; }
+//     bool isFilled() const  { return count_ >= SIZE; }
+
+//     void push(size_t index, Node *item) {
+//         if (count_ == SIZE)
+//             throw std::out_of_range("Index out of bounds!");
+
+//         table_[count_++] = {index, item};
+//     }
+
+//     void update(size_t index, Node *item) {
+//         table_[index] = item;
+//     }
+
+//     void erase(size_t index) {
+//         table_.erase(index);
+//     }
+
+//     void clear() {
+//         table_.clear();
+//     }
+ };*/
+
+
+/* template <typename NodeItemType, size_t CAPACITY>
+// class IndexTable
+// {
+//     using NodeBase   = Details::BlockListNodeBase;
+//     using Node       = Details::BlockListNode<NodeItemType>;
+
+// public:
+//     IndexTable() = default;
+
+//           Node*  operator[](size_t index)       { return table_[index]; }
+//     const Node*  operator[](size_t index) const { return table_[index]; }
+
+//     size_t count()    const  { return table_.size(); }
+//     bool   isFilled() const  { return table_.size() >= CAPACITY; }
+
+//     const auto begin() const { return table_.begin(); }
+//     const auto end()   const { return table_.end(); }
+
+//     void insert(size_t index, Node *item) {
+//         if (table_.size() >= CAPACITY)
+//             throw std::out_of_range("Table is filled!");
+
+//         if (table_.count(index) > 0) return;
+
+//         table_[index] = item;
+//     }
+
+//     void update(size_t index, Node *item) {
+//         table_[index] = item;
+//     }
+
+//     void erase(size_t index) {
+//         table_.erase(index);
+//     }
+
+//     void clear() {
+//         table_.clear();
+//     }
+
+// private:
+//     std::unordered_map<size_t, Node*> table_{};
+};
+*/
 }
 
 template <typename T>
 class BlockList
 {
-private:
-    static constexpr uint16_t TABLE_SIZE = 7;
+    static constexpr uint16_t TABLE_CAP = 7;
+    using IndexTable = Details::IndexTable<T, TABLE_CAP>;
 
     using NodeBase   = Details::BlockListNodeBase;
     using Node       = Details::BlockListNode<T>;
-    using IndexTable = Details::IndexTable<Node, TABLE_SIZE>;
-
-    IndexTable table_{};
 
 public:
     BlockList()
@@ -150,9 +266,11 @@ public:
     }
 
     T &operator[](size_t pos) {
-        Node* current = findNode(pos);
-        size_t blockIndex = 0;
-        return current->at(pos);
+        if (pos >= size_)
+            throw std::out_of_range("Index out of bounds!");
+
+        Node *found = table_.findClosest(pos);
+        return found->at(0);
     }
 
     BlockList &operator=(const BlockList &other) {
@@ -187,21 +305,15 @@ public:
         return *this;
     }
 
-    friend std::ostream &operator<<(std::ostream &os, const BlockList &list) {
-        for (auto &el : list)
-            os << el << "\n";
-        return os;
-    }
-
     size_t size()  const { return size_; }
     bool   empty() const { return sent_->next == sent_; }
 
-
     template <typename U>
     void insertFront(U &&item) {
-        Node *head = static_cast<Node *>(sent_->next);
         ++size_;
-        if (head == sent_) {
+
+        Node *head = static_cast<Node *>(sent_->next);
+        if (empty()) {
             initFirstNode(std::forward<U>(item));
             return;
         }
@@ -214,22 +326,22 @@ public:
         Node *add = new Node;
         add->pushFront(std::forward<U>(item));
 
-        add->next = head;
-        add->prev = sent_;
+        insertNodeBetween(sent_, add, head);
 
-        head->prev = add;
-        sent_->next = add;
+        if (!table_.isFilled())
+            table_.insert(0, add);
     }
 
     template <typename U>
     void insertBack(U &&item) {
-        Node *tail = static_cast<Node *>(sent_->prev);
         ++size_;
-        if (tail == sent_) {
+
+        if (empty()) {
             initFirstNode(std::forward<U>(item));
             return;
         }
 
+        Node *tail = static_cast<Node *>(sent_->prev);
         if (!tail->isFilled()) {
             tail->pushBack(std::forward<U>(item));
             return;
@@ -238,11 +350,10 @@ public:
         Node *add = new Node;
         add->pushBack(std::forward<U>(item));
 
-        add->next = sent_;
-        add->prev = sent_->prev;
+        insertNodeBetween(tail, add, sent_);
 
-        tail->next = add;
-        sent_->prev = add;
+        if (!table_.isFilled())
+            table_.insert(size_ - 1, add);
     }
 
     template <typename U>
@@ -260,15 +371,15 @@ public:
             return;
         }
 
-        Node *curr = findNode(pos);
         ++size_;
 
+        Node *curr = findNode(pos);
         if (!curr->isFilled()) {
             curr->push(pos, std::forward<U>(item));
             return;
         }
 
-        T lastItem = curr->at(curr->size - 1);
+        T lastItem = std::move(curr->last());
         curr->shiftRight(pos);
         curr->set(pos, std::forward<U>(item));
 
@@ -279,14 +390,10 @@ public:
             Node *add = new Node;
             add->pushBack(std::move(lastItem));
 
-            add->next = curr->next;
-            add->prev = curr;
-
-            curr->next->prev = add;
-            curr->next = add;
+            insertNodeBetween(curr, add, curr->next);
 
             if (!table_.isFilled())
-                table_.push(pos, add);
+                table_.insert(pos, add);
         }
     }
 
@@ -300,36 +407,56 @@ public:
 
         sent_->next = sent_;
         sent_->prev = sent_;
+
+        table_.clear();
+
         size_ = 0;
     }
 
-private:
+private:    
+    void insertNodeBetween(NodeBase *before, NodeBase *node, NodeBase *after) {
+        node->next = after;
+        node->prev = before;
+
+        after->prev = node;
+        before->next = node;
+    }
+
     template <typename U>
     void initFirstNode(U &&item) {
         Node *add = new Node;
         add->pushFront(std::forward<U>(item));
 
-        add->next = sent_;
-        add->prev = sent_;
+        insertNodeBetween(sent_, add, sent_);
 
-        sent_->next = add;
-        sent_->prev = add;
+        if (!table_.isFilled())
+            table_.insert(size_ - 1, add);
     }
 
-    Node *findNode(size_t &pos) {
-        Node *res = static_cast<Node *>(sent_->next);
-        while (res != sent_) {
-            if (pos < res->count())
-                return res;
+    // Node *findNode(size_t &pos) {
+    //     Node *res = static_cast<Node *>(sent_->next);
 
-            pos -= res->count();
-            res = static_cast<Node *>(res->next);
-        }
-        return res;
+    //     while (res != sent_) {
+    //         if (pos < res->count())
+    //             return res;
+
+    //         pos -= res->count();
+    //         res = static_cast<Node *>(res->next);
+    //     }
+
+    //     return sent_;
+    // }
+
+    Node *findNode(size_t &pos) {
+        Node *found = table_.findClosest(pos);
+        if (!found)
+            throw std::out_of_range("!found");
+        return found;
     }
 
     size_t size_;
     NodeBase *sent_;
+    IndexTable table_{};
 };
 
 /*template <typename U>
