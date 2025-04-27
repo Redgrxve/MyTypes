@@ -10,6 +10,9 @@
 
 #define DEBUG
 
+//TO DO
+//удаление без полного переделывания таблицы
+
 namespace Details {
 
 struct BlockListNodeBase {
