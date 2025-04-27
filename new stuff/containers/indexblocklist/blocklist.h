@@ -3,9 +3,12 @@
 #include <cstdint>
 #include <array>
 #include <algorithm>
+#include <iostream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#define DEBUG
 
 namespace Details {
 
@@ -176,6 +179,13 @@ public:
     void clear() {
         table_.clear();
     }
+
+#ifdef DEBUG
+    void printIndexes(){
+        for (auto el : table_)
+            std::cout << el.index << "\n";
+    }
+#endif
  };
 
 }
@@ -389,7 +399,31 @@ public:
         if (empty()) return;
         table_.clear();
 
-        size_t step = (size_ + table_.capacity() - 1) / table_.capacity(); // равномерный шаг
+        const size_t capacity = table_.capacity();
+        const size_t total = size_;
+        const size_t step = (total + capacity - 1) / capacity;
+
+        Node* node = static_cast<Node*>(sent_->next);
+        size_t nodeStart{};
+        size_t threshold{};
+
+        while(table_.count() < capacity && threshold < total) {
+            while (node != sent_ && nodeStart + node->count() <= threshold) {
+                nodeStart += node->count();
+                node = static_cast<Node*>(node->next);
+            }
+            if (node == sent_) break;
+
+            table_.insert(nodeStart, node);
+
+            threshold += step;
+        }
+
+
+        /*if (empty()) return;
+        table_.clear();
+
+        const size_t step = (size_ + table_.capacity() - 1) / table_.capacity();
 
         size_t currIndex{};
         size_t insertIndex{};
@@ -407,8 +441,14 @@ public:
             }
             node = static_cast<Node*>(node->next);
             nodeIndex += node->count();
-        }
+        }*/
     }
+
+#ifdef DEBUG
+    void printIndexTable() {
+        table_.printIndexes();
+    }
+#endif
 
 private:
     void insertNodeBetween(NodeBase *before, NodeBase *node, NodeBase *after) {
