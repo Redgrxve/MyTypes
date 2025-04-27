@@ -27,6 +27,7 @@ public:
 
     uint16_t count()  const { return count_; }
     bool     filled() const { return count_ == SIZE; }
+    bool     empty()  const { return count_ == 0; }
 
     template <typename U>
     void set(size_t pos, U &&item) {
@@ -76,6 +77,15 @@ public:
         ++count_;
     }
 
+    void erase(size_t pos) {
+        if (empty())
+            throw std::out_of_range("Node is empty");
+
+        for (int i = pos; i < SIZE - 1; ++i)
+            items_[i] = std::move_if_noexcept(items_[i + 1]);
+        --count_;
+    }
+
     void shiftRight(size_t start = 0) {
         for (int i = SIZE - 1; i > start; --i)
             items_[i] = std::move_if_noexcept(items_[i - 1]);
@@ -98,9 +108,11 @@ private:
         Node *node{};
     };
 
-    std::vector<TableRow> table_{};
+    using RowVector = std::vector<TableRow>;
 
-public:
+    RowVector table_{};
+
+public:    
     IndexTable() { table_.reserve(CAPACITY); }
     IndexTable(const IndexTable &other) = default;
     IndexTable(IndexTable &&other) : table_(std::move(other.table_)) {}
@@ -115,9 +127,17 @@ public:
           TableRow &operator[](size_t i)       { return table_[i]; }
     const TableRow &operator[](size_t i) const { return table_[i]; }
 
-    bool contains(size_t index) const {
+    bool containsIndex(size_t index) const {
         const auto pred = [index](const TableRow &row){
             return index == row.index;
+        };
+        const auto it = std::find_if(table_.begin(), table_.end(), pred);
+        return it != table_.end();
+    }
+
+    bool containsNode(const Node *node) const {
+        const auto pred = [node](const TableRow &row){
+            return node == row.node;
         };
         const auto it = std::find_if(table_.begin(), table_.end(), pred);
         return it != table_.end();
@@ -151,6 +171,18 @@ public:
         });
     }
 
+    /*NOT READY
+    // void eraseIfContains(size_t index) {
+    //     const auto pred = [index](const TableRow &row) {
+    //         return row.index == index;
+    //     };
+    //     const auto it = std::find_if(table_.begin(), table_.end(), pred);
+    //     if (it == table_.end()) return;
+
+    //     table_.erase(it);
+    //     decrementAfter(it);
+    // }*/
+
     void update(size_t elemIndex, size_t newIndex, Node *newNode) {
         table_[elemIndex] = {newIndex, newNode};
     }
@@ -168,6 +200,31 @@ public:
         auto it = std::find_if(table_.begin(), table_.end(), pred);
         while (it != table_.end()) {
             ++it->index;
+            ++it;
+        }
+    }
+
+    void incrementAfter(typename RowVector::iterator it) {
+        while (it != table_.end()) {
+            ++it->index;
+            ++it;
+        }
+    }
+
+    void decrementAfter(size_t index) {
+        const auto pred = [index](const TableRow &row) {
+            return row.index > index;
+        };
+        auto it = std::find_if(table_.begin(), table_.end(), pred);
+        while (it != table_.end()) {
+            --it->index;
+            ++it;
+        }
+    }
+
+    void decrementAfter(typename RowVector::iterator it) {
+        while (it != table_.end()) {
+            --it->index;
             ++it;
         }
     }
@@ -377,6 +434,27 @@ public:
 
             table_.incrementAfter(pos);
         }
+    }
+
+    void erase(size_t pos) {
+        if (pos >= size_)
+            throw std::out_of_range("Index out of bounds");
+
+        size_t elPos{};
+        Node *node = findNode(pos, elPos);
+        node->erase(elPos);
+        if (node->empty()) {
+            node->prev->next = node->next;
+            node->next->prev = node->prev;
+
+            delete node;
+
+            if (table_.containsNode(node))
+                rebuildIndexTable();
+        } else {
+            table_.decrementAfter(pos);
+        }
+        --size_;
     }
 
     void clear() {
