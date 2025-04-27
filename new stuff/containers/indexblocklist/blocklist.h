@@ -120,9 +120,10 @@ public:
         return it != table_.end();
     }
 
-    size_t count()  const   { return table_.size(); }
-    bool   filled() const   { return table_.size() >= CAPACITY; }
-    bool   empty()  const   { return table_.size() == 0; }
+    size_t capacity() const { return CAPACITY; }
+    size_t count()    const { return table_.size(); }
+    bool   filled()   const { return table_.size() >= CAPACITY; }
+    bool   empty()    const { return table_.size() == 0; }
 
     const TableRow &findClosest(size_t index) const {
         if (empty())
@@ -149,6 +150,12 @@ public:
 
     void update(size_t elemIndex, size_t newIndex, Node *newNode) {
         table_[elemIndex] = {newIndex, newNode};
+    }
+
+    void incrementAll() {
+        for (auto &el : table_) {
+            ++el.index;
+        }
     }
 
     void incrementAfter(size_t index) {
@@ -277,6 +284,7 @@ public:
 
         if (!head->filled()) {
             head->pushFront(std::forward<U>(item));
+            table_.incrementAfter(0);
             return;
         }
 
@@ -285,8 +293,13 @@ public:
 
         insertNodeBetween(sent_, add, head);
 
-        table_.update(0, 0, add);
-        table_.incrementAfter(0);
+        if (!table_.filled()) {
+            table_.incrementAll();
+            table_.insert(0, add);
+        } else {
+            table_.update(0, 0, add);
+            table_.incrementAfter(0);
+        }
     }
 
     template <typename U>
@@ -372,8 +385,29 @@ public:
         size_ = 0;
     }
 
-    void updateIndexTable() {
+    void rebuildIndexTable() {
+        if (empty()) return;
+        table_.clear();
 
+        size_t step = (size_ + table_.capacity() - 1) / table_.capacity(); // равномерный шаг
+
+        size_t currIndex{};
+        size_t insertIndex{};
+
+        Node* node = static_cast<Node*>(sent_->next);
+        size_t nodeIndex{};
+        while (node != sent_) {
+            for (size_t i = 0; i < node->count(); ++i) {
+                if (currIndex >= insertIndex && !table_.filled()) {
+                    table_.insert(nodeIndex, node);
+                    insertIndex += step;
+                    break;
+                }
+                ++currIndex;
+            }
+            node = static_cast<Node*>(node->next);
+            nodeIndex += node->count();
+        }
     }
 
 private:
@@ -392,8 +426,7 @@ private:
 
         insertNodeBetween(sent_, add, sent_);
 
-        if (!table_.filled())
-            table_.insert(size_ - 1, add);
+        table_.insert(0, add);
     }
 
     Node *findNode(size_t pos, size_t &indexInNode) const {
