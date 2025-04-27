@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <array>
-#include <set>
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 
@@ -21,8 +21,8 @@ class BlockListNode : public BlockListNodeBase
 public:
     static constexpr uint16_t SIZE = 4;
 
-    uint16_t count()    const { return count_; }
-    bool     isFilled() const { return count_ == SIZE; }
+    uint16_t count()  const { return count_; }
+    bool     filled() const { return count_ == SIZE; }
 
     template <typename U>
     void set(size_t pos, U &&item) {
@@ -82,12 +82,16 @@ private:
     std::array<T, SIZE> items_{};
 };
 
-template <typename NodeItemType, size_t CAPACITY>
+/*template <typename NodeItemType, size_t CAPACITY>
 class IndexTable
 {
     using NodeBase = Details::BlockListNodeBase;
     using Node     = Details::BlockListNode<NodeItemType>;
-    using TableRow = std::pair<size_t, Node*>;
+
+    struct TableRow {
+        size_t index{};
+        Node *node{};
+    };
 
 public:
     IndexTable() = default;
@@ -96,26 +100,42 @@ public:
     // const Node *operator[](size_t pos) const { return table_[pos].second(); }
 
     size_t count() const   { return table_.size_; }
-    bool isFilled() const  { return table_.size() == CAPACITY; }
+    bool filled() const  { return table_.size() == CAPACITY; }
 
-    Node *findClosest(size_t pos) {
-        if (table_.empty()) return nullptr;
+    bool contains(size_t index) const { return table_.find({index, nullptr}) != table_.end(); }
 
-        auto it = table_.lower_bound({pos + 1, nullptr});
+    const TableRow &findClosest(size_t index) {
+        if (table_.empty())
+            throw std::out_of_range("Table is empty");
+
+        auto it = table_.lower_bound({index + 1, nullptr});
         --it;
 
-        return it->second;
+        return *it;
     }
 
     void insert(size_t index, Node *node) {
         if (table_.size() >= CAPACITY)
-            throw std::out_of_range("Table is filled!");
+            throw std::out_of_range("Table is filled");
 
         table_.insert({index, node});
     }
 
-    void update(size_t index, Node *item) {
-        table_[index] = item;
+    void update(size_t index, Node *node, bool incrementOther = true) {
+        auto it = table_.find({index, nullptr});
+        if (it == table_.end())
+            throw std::out_of_range("Position not found in table");
+
+        table_.erase(it);
+        table_.insert({index, node});
+
+        if(incrementOther) {
+            ++it;
+            while (it != table_.end()) {
+                ++it->index;
+                ++it;
+            }
+        }
     }
 
     void erase(size_t index) {
@@ -129,56 +149,72 @@ public:
 private:
     struct RowComparator {
         bool operator()(const TableRow &a, const TableRow &b) const {
-            return a.first < b.first;
+            return a.index < b.index;
         }
     };
 
     std::set<TableRow, RowComparator> table_{};
-};
+};*/
 
-/* template <typename NodeItemType, size_t SIZE>
-// class IndexTable
-// {
-//     using NodeBase   = Details::BlockListNodeBase;
-//     using Node       = Details::BlockListNode<NodeItemType>;
+template <typename NodeItemType, size_t CAPACITY>
+class IndexTable
+{
+    using NodeBase   = Details::BlockListNodeBase;
+    using Node       = Details::BlockListNode<NodeItemType>;
 
-// private:
-//     struct IndexTableRow {
-//         size_t index{};
-//         Node *item{};
-//     };
+private:
+    struct TableRow {
+        size_t index{};
+        Node *item{};
+    };
 
-//     std::array<IndexTableRow, SIZE> table_{};
-//     uint16_t count_{};
+    std::array<TableRow, CAPACITY> table_{};
+    uint16_t count_{};
 
-// public:
-//     IndexTable() = default;
+public:
+    IndexTable() = default;
 
-//           IndexTableRow &operator[](size_t i)       { return table_[i]; }
-//     const IndexTableRow &operator[](size_t i) const { return table_[i]; }
+          TableRow &operator[](size_t i)       { return table_[i]; }
+    const TableRow &operator[](size_t i) const { return table_[i]; }
 
-//     size_t count() const   { return table_.size_; }
-//     bool isFilled() const  { return count_ >= SIZE; }
+    bool contains(size_t index) const { return table_.find({index, nullptr}) != table_.end(); }
 
-//     void push(size_t index, Node *item) {
-//         if (count_ == SIZE)
-//             throw std::out_of_range("Index out of bounds!");
+    size_t count() const   { return table_.size_; }
+    bool filled() const  { return count_ >= CAPACITY; }
 
-//         table_[count_++] = {index, item};
-//     }
+    const TableRow &findClosest(size_t index) {
+        if (table_.empty())
+            throw std::out_of_range("Table is empty");
 
-//     void update(size_t index, Node *item) {
-//         table_[index] = item;
-//     }
+        auto it = std::lower_bound(table_.begin(), table_.end(),
+                                   {index + 1, nullptr},
+                                   [](const TableRow &a, const TableRow &b)
+                                   { return a.index < b.index; });
+        --it;
 
-//     void erase(size_t index) {
-//         table_.erase(index);
-//     }
+        return *it;
+    }
 
-//     void clear() {
-//         table_.clear();
-//     }
- };*/
+    void insert(size_t index, Node *item) {
+        if (count_ == CAPACITY)
+            throw std::out_of_range("Index out of bounds!");
+
+        table_[count_++] = {index, item};
+    }
+
+    void update(size_t index, Node *item) {
+        table_[index] = item;
+    }
+
+    void erase(size_t index) {
+        table_.erase(index);
+    }
+
+    void clear() {
+        table_.clear();
+        count_ = 0;
+    }
+ };
 
 
 /* template <typename NodeItemType, size_t CAPACITY>
@@ -267,10 +303,10 @@ public:
 
     T &operator[](size_t pos) {
         if (pos >= size_)
-            throw std::out_of_range("Index out of bounds!");
+            throw std::out_of_range("Index out of bounds");
 
-        Node *found = table_.findClosest(pos);
-        return found->at(0);
+        Node *node = findNode(pos);
+        return node->at(pos);
     }
 
     BlockList &operator=(const BlockList &other) {
@@ -318,7 +354,7 @@ public:
             return;
         }
 
-        if (!head->isFilled()) {
+        if (!head->filled()) {
             head->pushFront(std::forward<U>(item));
             return;
         }
@@ -328,7 +364,9 @@ public:
 
         insertNodeBetween(sent_, add, head);
 
-        if (!table_.isFilled())
+        if (table_.contains(0))
+            table_.update(0, add);
+        else if (!table_.filled())
             table_.insert(0, add);
     }
 
@@ -342,7 +380,7 @@ public:
         }
 
         Node *tail = static_cast<Node *>(sent_->prev);
-        if (!tail->isFilled()) {
+        if (!tail->filled()) {
             tail->pushBack(std::forward<U>(item));
             return;
         }
@@ -352,7 +390,7 @@ public:
 
         insertNodeBetween(tail, add, sent_);
 
-        if (!table_.isFilled())
+        if (!table_.filled())
             table_.insert(size_ - 1, add);
     }
 
@@ -374,7 +412,7 @@ public:
         ++size_;
 
         Node *curr = findNode(pos);
-        if (!curr->isFilled()) {
+        if (!curr->filled()) {
             curr->push(pos, std::forward<U>(item));
             return;
         }
@@ -384,7 +422,7 @@ public:
         curr->set(pos, std::forward<U>(item));
 
         Node *next = static_cast<Node *>(curr->next);
-        if (!next->isFilled()) {
+        if (!next->filled()) {
             next->pushFront(std::move(lastItem));
         } else {
             Node *add = new Node;
@@ -392,7 +430,7 @@ public:
 
             insertNodeBetween(curr, add, curr->next);
 
-            if (!table_.isFilled())
+            if (!table_.filled())
                 table_.insert(pos, add);
         }
     }
@@ -413,7 +451,7 @@ public:
         size_ = 0;
     }
 
-private:    
+private:
     void insertNodeBetween(NodeBase *before, NodeBase *node, NodeBase *after) {
         node->next = after;
         node->prev = before;
@@ -429,7 +467,7 @@ private:
 
         insertNodeBetween(sent_, add, sent_);
 
-        if (!table_.isFilled())
+        if (!table_.filled())
             table_.insert(size_ - 1, add);
     }
 
@@ -448,10 +486,17 @@ private:
     // }
 
     Node *findNode(size_t &pos) {
-        Node *found = table_.findClosest(pos);
-        if (!found)
-            throw std::out_of_range("!found");
-        return found;
+        auto found = table_.findClosest(pos);
+        Node *curr = found.node;
+        size_t index = found.index;
+
+        while (index + curr->count() <= pos) {
+            index += curr->count();
+            curr = static_cast<Node*>(curr->next);
+        }
+
+        pos -= index;
+        return curr;
     }
 
     size_t size_;

@@ -9,10 +9,10 @@ int main()
          l.insertBack("str" + std::to_string(i + 1));
     }
 
-    // l.insert(0, "new0");
-    // l.insert(1, "new1");
-    // l.insert(1, "new2");
-    // l.insert(2, "new3");
+    l.insert(0, "new0");
+    l.insert(1, "new1");
+    l.insert(1, "new2");
+    l.insert(2, "new3");
 
     // l.insert(12, "new2");
     // l.insert(10, "new3");
