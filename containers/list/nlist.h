@@ -1,3 +1,5 @@
+#ifndef NLIST_H
+#define NLIST_H
 
 #include <cstddef>
 #include <iostream>
@@ -31,11 +33,19 @@ class NList
     using Node     = Details::ListNode<T>;
 
 public:
+    using value_type = T;
+
     class ConstIterator
     {
         friend class NList;
 
     public:
+        using value_type = T;
+        using reference = const T&;
+        using pointer = const T*;
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::bidirectional_iterator_tag;
+
         ConstIterator() = default;
 
         //prefix
@@ -127,8 +137,78 @@ public:
             : ConstIterator(node) {}
     };
 
-    using ReverseIterator      = std::reverse_iterator<NList<T>::Iterator>;
-    using ConstReverseIterator = std::reverse_iterator<NList<T>::ConstIterator>;
+    class ConstReverseIterator : public ConstIterator
+    {
+        friend class NList;
+
+        using ConstIterator::node_;
+
+    public:
+        ConstReverseIterator() : ConstIterator() {}
+        ConstReverseIterator(ConstIterator it) : ConstIterator(it.node_) {}
+
+        //prefix
+        ConstReverseIterator& operator++() {
+            node_ = node_->prev;
+            return *this;
+        }
+
+        //postfix
+        ConstReverseIterator operator++(int) {
+            auto tmp = *this;
+            node_ = node_->prev;
+            return tmp;
+        }
+
+        const T& operator*() const {
+            auto tmp = node_;
+            tmp = tmp->prev;
+            return static_cast<Node*>(tmp)->value;
+        }
+
+    private:
+        explicit ConstReverseIterator(NodeBase* node)
+            : ConstIterator(node) {
+        }
+    };
+
+    class ReverseIterator : public ConstIterator
+    {
+        friend class NList;
+
+        using ConstIterator::node_;
+
+    public:
+        ReverseIterator() : ConstIterator() {}
+        ReverseIterator(ConstIterator it) : ConstIterator(it.node_) {}
+
+        //prefix
+        ReverseIterator& operator++() {
+            node_ = node_->prev;
+            return *this;
+        }
+
+        //postfix
+        ReverseIterator operator++(int) {
+            auto tmp = *this;
+            node_ = node_->prev;
+            return tmp;
+        }
+
+        T& operator*() {
+            auto tmp = node_;
+            tmp = tmp->prev;
+            return static_cast<Node*>(tmp)->value;
+        }
+
+    private:
+        explicit ReverseIterator(NodeBase* node)
+            : ConstIterator(node) {
+        }
+    };
+
+    /*using ReverseIterator      = std::reverse_iterator<NList<T>::Iterator>;
+    using ConstReverseIterator = std::reverse_iterator<NList<T>::ConstIterator>;*/
 
 public:
     NList()
@@ -159,7 +239,7 @@ public:
         clear();
         delete sent_;
     }
-    
+
     NList &operator=(const NList &other) {
         if (this == &other) return *this;
 
@@ -207,14 +287,14 @@ public:
     ConstIterator cbegin() const { return ConstIterator(sent_->next); }
     ConstIterator cend()   const { return ConstIterator(sent_); }
 
-    /* ConstReverseIterator crbegin() const { return ConstReverseIterator(cbegin()); }
-    // ConstReverseIterator crend()   const { return ConstReverseIterator(cend()); }
+    ConstReverseIterator crbegin() const { return ConstReverseIterator(cend()); }
+    ConstReverseIterator crend()   const { return ConstReverseIterator(cbegin()); }
 
-    // ConstReverseIterator rbegin()  const { return ConstReverseIterator(cbegin()); }
-    // ReverseIterator      rbegin()        { return ConstReverseIterator(begin()); }
+    ConstReverseIterator rbegin()  const { return ConstReverseIterator(cend()); }
+    ReverseIterator      rbegin()        { return ConstReverseIterator(end()); }
 
-    // ConstReverseIterator rend()    const { return ConstReverseIterator(cend()); }
-     ReverseIterator      rend()          { return ConstReverseIterator(end()); }*/
+    ConstReverseIterator rend()    const { return ConstReverseIterator(cbegin()); }
+    ReverseIterator      rend()          { return ConstReverseIterator(begin()); }
 
 
     size_t size()  const { return size_; }
@@ -228,6 +308,7 @@ public:
         add->next = sent_->next;
         add->prev = sent_;
 
+        sent_->next->prev = add;
         sent_->next = add;
 
         ++size_;
@@ -248,6 +329,11 @@ public:
     }
 
     template <typename U>
+    void push_back(U &&item) {
+        insertBack(std::forward<U>(item));
+    }
+
+    template <typename U>
     void insert(ConstIterator it, U &&item) {
         Node *add = new Node(std::forward<U>(item));
         NodeBase *cur = it.node_;
@@ -259,6 +345,22 @@ public:
         cur->prev = add;
 
         ++size_;
+    }
+
+    Iterator erase(Iterator it) {
+        if (it == end())
+            throw std::out_of_range("Iterator out of bounds");
+
+        auto node = it.node_;
+        const auto next = node->next;
+
+        node->prev->next = node->next;
+        node->next->prev = node->prev;
+
+        delete node;
+
+        --size_;
+        return Iterator(next);
     }
 
     void clear() {
@@ -278,3 +380,5 @@ private:
     size_t size_;
     NodeBase *sent_;
 };
+
+#endif
