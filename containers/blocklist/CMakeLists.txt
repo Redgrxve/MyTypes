@@ -8,5 +8,8 @@ project(blocklist)
 add_executable(${PROJECT_NAME}
     main.cpp
     blocklist.h
+)
 
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    $<$<CONFIG:Debug>:DEBUG>
 )
