@@ -1,7 +1,7 @@
 #ifndef DEBUGLOG_H
 #define DEBUGLOG_H
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
     #include <iostream>

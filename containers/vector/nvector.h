@@ -13,7 +13,7 @@ public:
     NVector() = default;
 
     explicit NVector(size_t size)
-        : m_size{ size }, m_capacity{ m_size * 2 }, m_vec{ new T[m_capacity] }
+        : m_size{ size }, m_capacity{ m_size * 2 }, m_data{ new T[m_capacity] }
     {
         DEBUG_LOG("NVector(size_t size)");
     }
@@ -23,19 +23,19 @@ public:
     {
         DEBUG_LOG("NVector(const NVector& other))");
 
-        m_vec = new T[m_capacity];
+        m_data = new T[m_capacity];
         for (size_t i = 0; i < m_size; ++i)
-            m_vec[i] = other.m_vec[i];
+            m_data[i] = other.m_data[i];
     }
 
     NVector(NVector&& other) noexcept
-        : m_size{ other.m_size }, m_capacity{ other.m_capacity }, m_vec{ other.m_vec }
+        : m_size{ other.m_size }, m_capacity{ other.m_capacity }, m_data{ other.m_data }
     {
         DEBUG_LOG("NVector(NVector&& other)");
 
         other.m_size = 0;
         other.m_capacity = 0;
-        other.m_vec = nullptr;
+        other.m_data = nullptr;
     }
 
     NVector(const std::initializer_list<T>& initList)
@@ -48,13 +48,13 @@ public:
             return;
         }
 
-        m_vec = new T[m_capacity];
+        m_data = new T[m_capacity];
         size_t i{};
         for (const auto& elem : initList)
-            m_vec[i++] = elem;
+            m_data[i++] = elem;
     }
 
-    ~NVector() { delete[] m_vec; }
+    ~NVector() { delete[] m_data; }
 
     //OPERATORS
     NVector& operator=(const NVector& other)
@@ -65,18 +65,18 @@ public:
 
         if (m_capacity >= other.m_size) {
             for (size_t i = 0; i < other.m_size; ++i)
-                m_vec[i] = other.m_vec[i];
+                m_data[i] = other.m_data[i];
             m_size = other.m_size;
             return *this;
         }
 
         T* newVec = new T[other.m_capacity];
         for (size_t i = 0; i < other.m_size; ++i)
-            newVec[i] = other.m_vec[i];
+            newVec[i] = other.m_data[i];
 
-        delete[] m_vec;
+        delete[] m_data;
 
-        m_vec = newVec;
+        m_data = newVec;
         m_size = other.m_size;
         m_capacity = other.m_capacity;
         return *this;
@@ -88,13 +88,13 @@ public:
 
         if (&other == this) return *this;
 
-        delete[] m_vec;
+        delete[] m_data;
 
-        m_vec = other.m_vec;
+        m_data = other.m_data;
         m_size = other.m_size;
         m_capacity = other.m_capacity;
 
-        other.m_vec = nullptr;
+        other.m_data = nullptr;
         other.m_size = 0;
         other.m_capacity = 0;
         return *this;
@@ -104,14 +104,14 @@ public:
     {
         if (index >= m_size)
             throw std::out_of_range("Index out of bounds");
-        return m_vec[index];
+        return m_data[index];
     }
 
     const T& operator[](size_t index) const
     {
         if (index >= m_size)
             throw std::out_of_range("Index out of bounds");
-        return m_vec[index];
+        return m_data[index];
     }
 
     friend std::ostream& operator<<(std::ostream& os, const NVector& vec)
@@ -124,11 +124,11 @@ public:
     //METHODS
     size_t size() const { return m_size; }
 
-    T* begin() { return m_vec; }
-    T* end() { return m_vec + m_size; }
+    T* begin() { return m_data; }
+    T* end()   { return m_data + m_size; }
 
-    const T* begin() const { return m_vec; }
-    const T* end() const { return m_vec + m_size; }
+    const T* begin() const { return m_data; }
+    const T* end()   const { return m_data + m_size; }
 
     template<typename U>
     void pushBack(U&& item)
@@ -136,7 +136,7 @@ public:
         if (m_size >= m_capacity)
             resize();
 
-        m_vec[m_size] = std::forward<U>(item);
+        m_data[m_size] = std::forward<U>(item);
         ++m_size;
 
 #ifdef DEBUG
@@ -148,21 +148,43 @@ public:
 #endif
     }
 
+    void clear()
+    {
+        for (size_t i = m_size; i > 0; --i)
+            m_data[i - 1].~T();
+
+        m_size = 0;
+    }
+
+    void reserve(size_t newCapacity)
+    {
+        if (newCapacity <= m_capacity) return;
+
+        T* newData = new T[newCapacity];
+        for(size_t i = 0; i < m_size; ++i)
+            newData[i] = std::move_if_noexcept(m_data[i]);
+
+        delete[] m_data;
+
+        m_data = newData;
+        m_capacity = newCapacity;
+    }
+
 private:
     void resize()
     {
         m_capacity = (m_capacity == 0) ? 1 : m_capacity * 2;
         T* newVec = new T[m_capacity];
         for (int i = 0; i < m_size; ++i)
-            newVec[i] = std::move_if_noexcept(m_vec[i]);
+            newVec[i] = std::move_if_noexcept(m_data[i]);
 
-        delete[] m_vec;
-        m_vec = newVec;
+        delete[] m_data;
+        m_data = newVec;
     }
 
     size_t m_size{};
     size_t m_capacity{};
-    T* m_vec{};
+    T* m_data{};
 };
 
 #endif // NVECTOR_H
