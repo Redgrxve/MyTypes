@@ -18,6 +18,14 @@ public:
         DEBUG_LOG("NVector(size_t size)");
     }
 
+    NVector(size_t size, const T &init)
+        : m_size{ size }, m_capacity{ m_size * 2 }, m_data{ new T[m_capacity] }
+    {
+        DEBUG_LOG("size_t size, const T& init");
+        for (size_t i = 0; i < m_size; ++i)
+            m_data[i] = init;
+    }
+
     NVector(const NVector& other)
         : m_size{ other.m_size }, m_capacity{ other.m_capacity }
     {
